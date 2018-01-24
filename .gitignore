@@ -1,0 +1,11 @@
+# Generated while building the package
+build/
+qwpython/
+*.egg-info
+
+# Generated after running game
+*.pyc
+
+# CLion stuff
+.idea/
+CmakeLists.txt
