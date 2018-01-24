@@ -40,7 +40,7 @@ typedef struct sizebuf_s
 	qboolean	overflowed;		// set to true if the buffer size failed
 	byte	*data;
 	int		maxsize;
-	int		cursize;
+	ssize_t	cursize;
 } sizebuf_t;
 
 void SZ_Clear (sizebuf_t *buf);
@@ -176,11 +176,9 @@ void COM_AddParm (char *parm);
 
 void COM_Init (void);
 void COM_InitArgv (int argc, char **argv);
+void Init_Py_Argv(void);
 
-char *COM_SkipPath (char *pathname);
-void COM_StripExtension (char *in, char *out);
 void COM_FileBase (char *in, char *out);
-void COM_DefaultExtension (char *path, char *extension);
 
 char	*va(char *format, ...);
 // does a varargs printf into a temp buffer
@@ -188,20 +186,12 @@ char	*va(char *format, ...);
 
 //============================================================================
 
-extern int com_filesize;
-struct cache_user_s;
-
 extern	char	com_gamedir[MAX_OSPATH];
 
-void COM_WriteFile (char *filename, void *data, int len);
-int COM_FOpenFile (char *filename, FILE **file);
-void COM_CloseFile (FILE *h);
-
+unsigned short COM_CRC_File(char *path);
+byte *COM_LoadFile (char *path, int useHunk);
 byte *COM_LoadStackFile (char *path, void *buffer, int bufsize);
-byte *COM_LoadTempFile (char *path);
 byte *COM_LoadHunkFile (char *path);
-void COM_LoadCacheFile (char *path, struct cache_user_s *cu);
-void COM_CreatePath (char *path);
 void COM_Gamedir (char *dir);
 
 extern	struct cvar_s	registered;

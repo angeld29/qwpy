@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <math.h>
 #include "quakedef.h"
 
-void Sys_Error (char *error, ...);
+//void Sys_Error (char *error, ...);
 
 vec3_t vec3_origin = {0,0,0};
 int nanmask = 255<<23;
@@ -376,6 +376,18 @@ vec_t Length(vec3_t v)
 	for (i=0 ; i< 3 ; i++)
 		length += v[i]*v[i];
 	length = sqrt (length);		// FIXME
+
+	return length;
+}
+
+vec_t LengthSquared(vec3_t v)
+{
+	int		i;
+	float	length;
+	
+	length = 0;
+	for (i=0 ; i< 3 ; i++)
+		length += v[i]*v[i];
 
 	return length;
 }

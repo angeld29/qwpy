@@ -34,6 +34,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <stdlib.h>
 #include <setjmp.h>
 #include <ctype.h>
+#include <time.h>
 
 #include "bothdefs.h"
 
@@ -55,6 +56,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "world.h"
 #include "pmove.h"
 
+#include "qwpython.h"
+
 //=============================================================================
 
 // the host system specifies the base of the directory tree, the
@@ -68,7 +71,7 @@ typedef struct
 	int		argc;
 	char	**argv;
 	void	*membase;
-	int		memsize;
+	size_t	memsize;
 } quakeparms_t;
 
 
@@ -81,14 +84,16 @@ extern	quakeparms_t host_parms;
 
 extern	cvar_t		sys_nostdout;
 extern	cvar_t		developer;
+extern  cvar_t      sv_aim;  // should be in qwp_entity.c, but temporarily here for pr_cmds.c too
 
 extern	qboolean	host_initialized;		// true if into command execution
 extern	double		host_frametime;
 extern	double		realtime;			// not bounded in any way, changed at
 										// start of every frame, never reset
 
-void SV_Error (char *error, ...);
-void SV_Init (quakeparms_t *parms);
+void SV_Error(char *error, ...);
+void SV_Init(quakeparms_t *parms);
+void SV_Init2(void);
 
 void Con_Printf (char *fmt, ...);
 void Con_DPrintf (char *fmt, ...);

@@ -83,7 +83,7 @@ void SV_Quit_f (void)
 {
 	SV_FinalMessage ("server shutdown\n");
 	Con_Printf ("Shutting down.\n");
-	SV_Shutdown ();
+//	SV_Shutdown ();  (quit will cause the main loop to exit, which will -then- call SV_Shutdown (BBP)
 	Sys_Quit ();
 }
 
@@ -303,7 +303,6 @@ void SV_Map_f (void)
 {
 	char	level[MAX_QPATH];
 	char	expanded[MAX_QPATH];
-	FILE	*f;
 
 	if (Cmd_Argc() != 2)
 	{
@@ -322,13 +321,11 @@ void SV_Map_f (void)
 
 	// check to make sure the level exists
 	sprintf (expanded, "maps/%s.bsp", level);
-	COM_FOpenFile (expanded, &f);
-	if (!f)
+	if (!Sys_ResourceExists(expanded))
 	{
 		Con_Printf ("Can't find %s\n", expanded);
 		return;
 	}
-	fclose (f);
 
 	SV_BroadcastCommand ("changing\n");
 	SV_SendMessagesToAll ();
@@ -395,7 +392,7 @@ void SV_Status_f (void)
 	Con_Printf ("net address      : %s\n",NET_AdrToString (net_local_adr));
 	Con_Printf ("cpu utilization  : %3i%%\n",(int)cpu);
 	Con_Printf ("avg response time: %i ms\n",(int)avg);
-	Con_Printf ("packets/frame    : %5.2f (%d)\n", pak, num_prstr);
+	Con_Printf ("packets/frame    : %5.2f\n", pak);
 	
 // min fps lat drp
 	if (sv_redirected != RD_NONE) {
@@ -431,7 +428,7 @@ void SV_Status_f (void)
 			}
 			Con_Printf ("%4i %4i %5.2f\n"
 				, (int)(1000*cl->netchan.frame_rate)
-				, (int)SV_CalcPing (cl)
+				, SV_CalcPing (cl)
 				, 100.0*cl->netchan.drop_count / cl->netchan.incoming_sequence);
 		}
 	} else {
@@ -465,7 +462,7 @@ void SV_Status_f (void)
 			}
 			Con_Printf ("%4i %4i %3.1f %4i"
 				, (int)(1000*cl->netchan.frame_rate)
-				, (int)SV_CalcPing (cl)
+				, SV_CalcPing (cl)
 				, 100.0*cl->netchan.drop_count / cl->netchan.incoming_sequence
 				, cl->netchan.qport);
 			if (cl->spectator)
@@ -796,17 +793,24 @@ void SV_Snap (int uid)
 		
 	for (i=0 ; i<=99 ; i++) 
 	{ 
+		FILE	*f;
 		pcxname[strlen(pcxname) - 6] = i/10 + '0'; 
 		pcxname[strlen(pcxname) - 5] = i%10 + '0'; 
 		sprintf (checkname, "%s/snap/%s", gamedirfile, pcxname);
-		if (Sys_FileTime(checkname) == -1)
+
+		f = fopen(checkname, "rb");
+		if (f)
+			fclose(f);
+		else
 			break;	// file doesn't exist
 	} 
+
 	if (i==100) 
 	{
 		Con_Printf ("Snap: Couldn't create a file, clean some out.\n"); 
 		return;
 	}
+
 	strcpy(cl->uploadfn, checkname);
 
 	memcpy(&cl->snap_from, &net_from, sizeof(net_from));

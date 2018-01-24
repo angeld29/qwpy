@@ -317,6 +317,7 @@ void SV_EmitPacketEntities (client_t *client, packet_entities_t *to, sizebuf_t *
 =============
 SV_WritePlayersToClient
 
+  Send extra info associated with other visible players to one given client
 =============
 */
 void SV_WritePlayersToClient (client_t *client, edict_t *clent, byte *pvs, sizebuf_t *msg)
@@ -475,7 +476,7 @@ void SV_WriteEntitiesToClient (client_t *client, sizebuf_t *msg)
 	for (e=MAX_CLIENTS+1, ent=EDICT_NUM(e) ; e<sv.num_edicts ; e++, ent = NEXT_EDICT(ent))
 	{
 		// ignore ents without visible models
-		if (!ent->v.modelindex || !*PR_GetString(ent->v.model))
+		if (!ent->v.modelindex || !PyString_Check(ent->v.model))
 			continue;
 
 		// ignore if not touching a PV leaf
@@ -496,6 +497,7 @@ void SV_WriteEntitiesToClient (client_t *client, sizebuf_t *msg)
 		state = &pack->entities[pack->num_entities];
 		pack->num_entities++;
 
+        // NOTE: this is where the key QC values get copied out to the clients
 		state->number = e;
 		state->flags = 0;
 		VectorCopy (ent->v.origin, state->origin);

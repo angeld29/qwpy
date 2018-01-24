@@ -38,7 +38,7 @@ cvar_t	sv_maxtic = {"sv_maxtic","0.1"};	// physics time tic
 
 cvar_t	developer = {"developer","0"};		// show extra messages
 
-cvar_t	timeout = {"timeout","65"};		// seconds without any message
+cvar_t	timeout_x = {"timeout","65"};		// seconds without any message
 cvar_t	zombietime = {"zombietime", "2"};	// seconds to sink messages
 											// after disconnect
 
@@ -186,12 +186,13 @@ void SV_DropClient (client_t *drop)
 	MSG_WriteByte (&drop->netchan.message, svc_disconnect);
 
 	if (drop->state == cs_spawned)
+	{
 		if (!drop->spectator)
 		{
 			// call the prog function for removing a client
 			// this will set the body to a dead frame, among other things
 			pr_global_struct->self = EDICT_TO_PROG(drop->edict);
-			PR_ExecuteProgram (pr_global_struct->ClientDisconnect);
+			PR_ExecuteProgram(pr_func_struct->ClientDisconnect);
 		}
 		else if (SpectatorDisconnect)
 		{
@@ -200,17 +201,15 @@ void SV_DropClient (client_t *drop)
 			pr_global_struct->self = EDICT_TO_PROG(drop->edict);
 			PR_ExecuteProgram (SpectatorDisconnect);
 		}
+	}
 
 	if (drop->spectator)
 		Con_Printf ("Spectator %s removed\n",drop->name);
 	else
 		Con_Printf ("Client %s removed\n",drop->name);
 
-	if (drop->download)
-	{
-		fclose (drop->download);
-		drop->download = NULL;
-	}
+	close_download(drop);
+
 	if (drop->upload)
 	{
 		fclose (drop->upload);
@@ -554,7 +553,7 @@ void SVC_DirectConnect (void)
 	if (s[0] && strcmp(s, "0"))
 	{
 		if (spectator_password.string[0] && 
-			stricmp(spectator_password.string, "none") &&
+			Q_strcasecmp(spectator_password.string, "none") &&
 			strcmp(spectator_password.string, s) )
 		{	// failed
 			Con_Printf ("%s:spectator password failed\n", NET_AdrToString (net_from));
@@ -569,7 +568,7 @@ void SVC_DirectConnect (void)
 	{
 		s = Info_ValueForKey (userinfo, "password");
 		if (password.string[0] && 
-			stricmp(password.string, "none") &&
+			Q_strcasecmp(password.string, "none") &&
 			strcmp(password.string, s) )
 		{
 			Con_Printf ("%s:password failed\n", NET_AdrToString (net_from));
@@ -687,6 +686,8 @@ void SVC_DirectConnect (void)
 
 	ent = EDICT_NUM(edictnum);	
 	newcl->edict = ent;
+
+    create_qwp_entity(ent);
 	
 	// parse some info from the info strings
 	SV_ExtractFromUserinfo (newcl);
@@ -698,7 +699,7 @@ void SVC_DirectConnect (void)
 	newcl->lockedtill = 0;
 
 	// call the progs to get default spawn parms for the new client
-	PR_ExecuteProgram (pr_global_struct->SetNewParms);
+	PR_ExecuteProgram(pr_func_struct->SetNewParms);
 	for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
 		newcl->spawn_parms[i] = (&pr_global_struct->parm1)[i];
 
@@ -1051,9 +1052,9 @@ qboolean SV_FilterPacket (void)
 
 	for (i=0 ; i<numipfilters ; i++)
 		if ( (in & ipfilters[i].mask) == ipfilters[i].compare)
-			return filterban.value;
+			return (qboolean)(filterban.value > 0);
 
-	return !filterban.value;
+	return !((qboolean)(filterban.value > 0));
 }
 
 //============================================================================
@@ -1146,7 +1147,7 @@ void SV_CheckTimeouts (void)
 	float	droptime;
 	int	nclients;
 	
-	droptime = realtime - timeout.value;
+	droptime = realtime - timeout_x.value;
 	nclients = 0;
 
 	for (i=0,cl=svs.clients ; i<MAX_CLIENTS ; i++,cl++)
@@ -1327,8 +1328,8 @@ void SV_InitLocal (void)
 
 	Cvar_RegisterVariable (&developer);
 
-	Cvar_RegisterVariable (&timeout);
 	Cvar_RegisterVariable (&zombietime);
+	Cvar_RegisterVariable (&timeout_x);
 
 	Cvar_RegisterVariable (&sv_maxvelocity);
 	Cvar_RegisterVariable (&sv_gravity);
@@ -1496,7 +1497,7 @@ void SV_ExtractFromUserinfo (client_t *cl)
 		val = Info_ValueForKey (cl->userinfo, "name");
 	}
 
-	if (!val[0] || !stricmp(val, "console")) {
+	if (!val[0] || !Q_strcasecmp(val, "console")) {
 		Info_SetValueForKey (cl->userinfo, "name", "unnamed", MAX_INFO_STRING);
 		val = Info_ValueForKey (cl->userinfo, "name");
 	}
@@ -1506,7 +1507,7 @@ void SV_ExtractFromUserinfo (client_t *cl)
 		for (i=0, client = svs.clients ; i<MAX_CLIENTS ; i++, client++) {
 			if (client->state != cs_spawned || client == cl)
 				continue;
-			if (!stricmp(client->name, val))
+			if (!Q_strcasecmp(client->name, val))
 				break;
 		}
 		if (i != MAX_CLIENTS) { // dup name
@@ -1514,11 +1515,12 @@ void SV_ExtractFromUserinfo (client_t *cl)
 				val[sizeof(cl->name) - 4] = 0;
 			p = val;
 
-			if (val[0] == '(')
+			if (val[0] == '(') {
 				if (val[2] == ')')
 					p = val + 3;
 				else if (val[3] == ')')
 					p = val + 4;
+			}
 
 			sprintf(newname, "(%d)%-.40s", dupc++, p);
 			Info_SetValueForKey (cl->userinfo, "name", newname, MAX_INFO_STRING);
@@ -1603,8 +1605,8 @@ void SV_InitNet (void)
 SV_Init
 ====================
 */
-void SV_Init (quakeparms_t *parms)
-{
+void SV_Init(quakeparms_t *parms)
+    {
 	COM_InitArgv (parms->argc, parms->argv);
 	COM_AddParm ("-game");
 	COM_AddParm ("qw");
@@ -1618,6 +1620,10 @@ void SV_Init (quakeparms_t *parms)
 		SV_Error ("Only %4.1f megs of memory reported, can't execute game", parms->memsize / (float)0x100000);
 
 	Memory_Init (parms->membase, parms->memsize);
+
+    // wipe the entire per-level structure, so when we start the first map, we can be sure there are no Python entities lying around
+	memset (&sv, 0, sizeof(sv));
+
 	Cbuf_Init ();
 	Cmd_Init ();	
 
@@ -1626,33 +1632,42 @@ void SV_Init (quakeparms_t *parms)
 	PR_Init ();
 	Mod_Init ();
 
-	SV_InitNet ();
-
 	SV_InitLocal ();
 	Sys_Init ();
 	Pmove_Init ();
 
 	Hunk_AllocName (0, "-HOST_HUNKLEVEL-");
-	host_hunklevel = Hunk_LowMark ();
 
-	Cbuf_InsertText ("exec server.cfg\n");
+	pr_global_struct = (globalvars_t *) Hunk_Alloc(sizeof(globalvars_t));
+    pr_func_struct = (globalfuncs_t *) Hunk_Alloc(sizeof(globalfuncs_t));
+
+	host_hunklevel = Hunk_LowMark ();
+    }
+
+    
+void SV_Init2(void)
+    {
+    Init_Py_Argv();
+	SV_InitNet();
+
+	Cbuf_InsertText("exec server.cfg\n");
 
 	host_initialized = true;
-	
+/*	
 	Con_Printf ("Exe: "__TIME__" "__DATE__"\n");
 	Con_Printf ("%4.1f megabyte heap\n",parms->memsize/ (1024*1024.0));	
 
 	Con_Printf ("\nServer Version %4.2f (Build %04d)\n\n", VERSION, build_number());
 
 	Con_Printf ("======== QuakeWorld Initialized ========\n");
-	
-// process command line arguments
+*/	
+    // process command line arguments
 	Cmd_StuffCmds_f ();
 	Cbuf_Execute ();
 
-// if a map wasn't specified on the command line, spawn start.map
+    // if a map wasn't specified on the command line, spawn start.map
 	if (sv.state == ss_dead)
 		Cmd_ExecuteString ("map start");
 	if (sv.state == ss_dead)
 		SV_Error ("Couldn't spawn a server");
-}
+    }

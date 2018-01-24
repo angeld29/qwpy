@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define	MAX_SIGNON_BUFFERS	8
 
+#include "Python.h"
+
 typedef enum {
 	ss_dead,			// no map loaded
 	ss_loading,			// spawning level edicts
@@ -157,10 +159,10 @@ typedef struct client_s
 	double			connection_started;	// or time of disconnect for zombies
 	qboolean		send_message;		// set on frames a datagram arived on
 
-// spawn parms are carried from level to level
+	// spawn parms are carried from level to level
 	float			spawn_parms[NUM_SPAWN_PARMS];
 
-// client known data for deltas	
+	// client known data for deltas	
 	int				old_frags;
 	
 	int				stats[MAX_CL_STATS];
@@ -168,14 +170,16 @@ typedef struct client_s
 
 	client_frame_t	frames[UPDATE_BACKUP];	// updates can be deltad from here
 
-	FILE			*download;			// file being downloaded
-	int				downloadsize;		// total bytes
+	PyObject		*download;			// Python String being downloaded
+	PyObject		*download_name;		// name of the item being downloaded
+	Py_ssize_t		downloadsize;		// total bytes
 	int				downloadcount;		// bytes sent
+	char			*download_ptr;		// current byte
 
 	int				spec_track;			// entnum of player tracking
 
 	double			whensaid[10];       // JACK: For floodprots
- 	int			whensaidhead;       // Head value for floodprots
+ 	int				whensaidhead;       // Head value for floodprots
  	double			lockedtill;
 
 	qboolean		upgradewarn;		// did we warn him?
@@ -355,13 +359,14 @@ int SV_CalcPing (client_t *cl);
 void SV_FullClientUpdate (client_t *client, sizebuf_t *buf);
 
 int SV_ModelIndex (char *name);
+int SV_ModelIndex_Py(PyObject *name);
 
 qboolean SV_CheckBottom (edict_t *ent);
 qboolean SV_movestep (edict_t *ent, vec3_t move, qboolean relink);
 
+void SV_FullClientUpdateToClient (client_t *client, client_t *cl);
 void SV_WriteClientdataToMessage (client_t *client, sizebuf_t *msg);
 
-void SV_MoveToGoal (void);
 
 void SV_SaveSpawnparms (void);
 
@@ -417,6 +422,7 @@ void SV_FindModelNumbers (void);
 void SV_ExecuteClientMessage (client_t *cl);
 void SV_UserInit (void);
 void SV_TogglePause (const char *msg);
+void close_download(client_t *c);
 
 
 //

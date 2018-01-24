@@ -775,7 +775,7 @@ SpectatorMove
 */
 void SpectatorMove (void)
 {
-	float	speed, drop, friction, control, newspeed, accel;
+	float	speed, drop, friction, control, newspeed; //, accel; (BBP unreferenced local)
 	float	currentspeed, addspeed, accelspeed;
 	int			i;
 	vec3_t		wishvel;

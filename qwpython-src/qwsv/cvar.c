@@ -36,10 +36,11 @@ Cvar_FindVar
 cvar_t *Cvar_FindVar (char *var_name)
 {
 	cvar_t	*var;
-	
 	for (var=cvar_vars ; var ; var=var->next)
 		if (!Q_strcmp (var_name, var->name))
+		    {
 			return var;
+			}
 
 	return NULL;
 }
@@ -75,7 +76,7 @@ char *Cvar_VariableString (char *var_name)
 	return var->string;
 }
 
-
+#ifndef SERVERONLY
 /*
 ============
 Cvar_CompleteVariable
@@ -103,7 +104,7 @@ char *Cvar_CompleteVariable (char *partial)
 
 	return NULL;
 }
-
+#endif
 
 #ifdef SERVERONLY
 void SV_SendServerInfoChange(char *key, char *value);
@@ -125,30 +126,16 @@ void Cvar_Set (char *var_name, char *value)
 		return;
 	}
 
-#ifdef SERVERONLY
+	Z_Free (var->string);	// free the old value string
+	var->string = Z_Malloc(Q_strlen(value)+1);
+	Q_strcpy(var->string, value);
+	var->value = Q_atof(var->string);
 	if (var->info)
 	{
-		Info_SetValueForKey (svs.info, var_name, value, MAX_SERVERINFO_STRING);
-		SV_SendServerInfoChange(var_name, value);
+		Info_SetValueForKey(svs.info, var->name, var->string, MAX_SERVERINFO_STRING);
+		SV_SendServerInfoChange(var->name, var->string);
 //		SV_BroadcastCommand ("fullserverinfo \"%s\"\n", svs.info);
 	}
-#else
-	if (var->info)
-	{
-		Info_SetValueForKey (cls.userinfo, var_name, value, MAX_INFO_STRING);
-		if (cls.state >= ca_connected)
-		{
-			MSG_WriteByte (&cls.netchan.message, clc_stringcmd);
-			SZ_Print (&cls.netchan.message, va("setinfo \"%s\" \"%s\"\n", var_name, value));
-		}
-	}
-#endif
-	
-	Z_Free (var->string);	// free the old value string
-	
-	var->string = Z_Malloc (Q_strlen(value)+1);
-	Q_strcpy (var->string, value);
-	var->value = Q_atof (var->string);
 }
 
 /*
@@ -200,7 +187,9 @@ void Cvar_RegisterVariable (cvar_t *variable)
 	
 // set it through the function to be consistant
 	Cvar_Set (variable->name, value);
+	
 }
+
 
 /*
 ============
@@ -229,7 +218,7 @@ qboolean	Cvar_Command (void)
 	return true;
 }
 
-
+#ifndef SERVERONLY
 /*
 ============
 Cvar_WriteVariables
@@ -246,4 +235,6 @@ void Cvar_WriteVariables (FILE *f)
 		if (var->archive)
 			fprintf (f, "%s \"%s\"\n", var->name, var->string);
 }
+#endif
+
 

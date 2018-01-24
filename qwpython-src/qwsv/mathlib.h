@@ -18,6 +18,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 // mathlib.h
+#ifndef _MATHLIB_H_
+#define _MATHLIB_H_
 
 typedef float vec_t;
 typedef vec_t vec3_t[3];
@@ -52,6 +54,7 @@ void _VectorCopy (vec3_t in, vec3_t out);
 
 int VectorCompare (vec3_t v1, vec3_t v2);
 vec_t Length (vec3_t v);
+vec_t LengthSquared(vec3_t v);
 void CrossProduct (vec3_t v1, vec3_t v2, vec3_t cross);
 float VectorNormalize (vec3_t v);		// returns vector length
 void VectorInverse (vec3_t v);
@@ -89,3 +92,5 @@ void RotatePointAroundVector( vec3_t dst, const vec3_t dir, const vec3_t point, 
 	)										\
 	:										\
 		BoxOnPlaneSide( (emins), (emaxs), (p)))
+
+#endif

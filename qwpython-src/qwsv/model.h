@@ -22,7 +22,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define __MODEL__
 
 #include "modelgen.h"
-#include "spritegn.h"
 
 /*
 
@@ -50,7 +49,7 @@ BRUSH MODELS
 ==============================================================================
 */
 
-
+#ifndef SERVERONLY
 //
 // in memory representation
 //
@@ -63,6 +62,7 @@ typedef struct
 #define	SIDE_FRONT	0
 #define	SIDE_BACK	1
 #define	SIDE_ON		2
+#endif // SERVERONLY
 
 
 // plane_t structure
@@ -76,6 +76,8 @@ typedef struct mplane_s
 	byte	pad[2];
 } mplane_t;
 
+#ifndef SERVERONLY
+
 typedef struct texture_s
 {
 	char		name[16];
@@ -86,7 +88,7 @@ typedef struct texture_s
 	struct texture_s *alternate_anims;	// bmodels in frmae 1 use these
 	unsigned	offsets[MIPLEVELS];		// four mip maps stored
 } texture_t;
-
+#endif // SERVERONLY
 
 #define	SURF_PLANEBACK		2
 #define	SURF_DRAWSKY		4
@@ -95,6 +97,7 @@ typedef struct texture_s
 #define SURF_DRAWTILED		0x20
 #define SURF_DRAWBACKGROUND	0x40
 
+#ifndef SERVERONLY
 // !!! if this is changed, it must be changed in asm_draw.h too !!!
 typedef struct
 {
@@ -136,6 +139,8 @@ typedef struct msurface_s
 	byte		*samples;		// [numstyles*surfsize]
 } msurface_t;
 
+#endif //SERVERONLY
+
 typedef struct mnode_s
 {
 // common with leaf
@@ -149,9 +154,10 @@ typedef struct mnode_s
 // node specific
 	mplane_t	*plane;
 	struct mnode_s	*children[2];	
-
+#ifndef SERVERONLY
 	unsigned short		firstsurface;
 	unsigned short		numsurfaces;
+#endif // SERVERONLY
 } mnode_t;
 
 
@@ -169,9 +175,10 @@ typedef struct mleaf_s
 // leaf specific
 	byte		*compressed_vis;
 	struct efrag_s	*efrags;
-
+#ifndef SERVERONLY
 	msurface_t	**firstmarksurface;
 	int			nummarksurfaces;
+#endif // SERVERONLY
 	int			key;			// BSP sequence number for leaf's contents
 	byte		ambient_sound_level[NUM_AMBIENTS];
 } mleaf_t;
@@ -187,6 +194,8 @@ typedef struct
 	vec3_t		clip_maxs;
 } hull_t;
 
+
+#ifndef SERVERONLY
 /*
 ==============================================================================
 
@@ -291,6 +300,7 @@ typedef struct {
 	maliasframedesc_t	frames[1];
 } aliashdr_t;
 
+#endif // SERVERONLY
 //===================================================================
 
 //
@@ -334,26 +344,25 @@ typedef struct model_s
 //
 // brush model
 //
-	int			firstmodelsurface, nummodelsurfaces;
-
+#ifndef SERVERONLY
+    int			firstmodelsurface, nummodelsurfaces;
+#endif // SERVERONLY
 	int			numsubmodels;
 	dmodel_t	*submodels;
-
 	int			numplanes;
 	mplane_t	*planes;
-
 	int			numleafs;		// number of visible leafs, not counting 0
 	mleaf_t		*leafs;
-
+#ifndef SERVERONLY
 	int			numvertexes;
 	mvertex_t	*vertexes;
 
 	int			numedges;
 	medge_t		*edges;
-
+#endif // SERVERONLY
 	int			numnodes;
 	mnode_t		*nodes;
-
+#ifndef SERVERONLY
 	int			numtexinfo;
 	mtexinfo_t	*texinfo;
 
@@ -362,29 +371,26 @@ typedef struct model_s
 
 	int			numsurfedges;
 	int			*surfedges;
-
+#endif // SERVERONLY
 	int			numclipnodes;
 	dclipnode_t	*clipnodes;
-
+#ifndef SERVERONLY
 	int			nummarksurfaces;
 	msurface_t	**marksurfaces;
-
+#endif // SERVERONLY
 	hull_t		hulls[MAX_MAP_HULLS];
-
+#ifndef SERVERONLY
 	int			numtextures;
 	texture_t	**textures;
-
+#endif // SERVERONLY
 	byte		*visdata;
+#ifndef SERVERONLY
 	byte		*lightdata;
+#endif // SERVERONLY
 	char		*entities;
 
 	unsigned	checksum;		// for world models only
 	unsigned	checksum2;		// for world models only
-
-//
-// additional model data
-//
-	cache_user_t	cache;		// only access through Mod_Extradata
 
 } model_t;
 
@@ -396,7 +402,7 @@ model_t *Mod_ForName (char *name, qboolean crash);
 void	*Mod_Extradata (model_t *mod);	// handles caching
 void	Mod_TouchModel (char *name);
 
-mleaf_t *Mod_PointInLeaf (float *p, model_t *model);
+mleaf_t *Mod_PointInLeaf (vec3_t p, model_t *model);
 byte	*Mod_LeafPVS (mleaf_t *leaf, model_t *model);
 
 #endif	// __MODEL__

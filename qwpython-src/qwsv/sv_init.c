@@ -48,6 +48,14 @@ int SV_ModelIndex (char *name)
 	return i;
 }
 
+int SV_ModelIndex_Py(PyObject *name)
+    {
+    if (!name || (name == Py_None))
+        return 0;
+    else
+        return SV_ModelIndex(PyString_AsString(name));
+    }
+
 /*
 ================
 SV_FlushSignon
@@ -110,7 +118,7 @@ void SV_CreateBaseline (void)
 		{
 			svent->baseline.colormap = 0;
 			svent->baseline.modelindex =
-				SV_ModelIndex(PR_GetString(svent->v.model));
+				SV_ModelIndex_Py(svent->v.model);
 		}
 
 		//
@@ -167,7 +175,7 @@ void SV_SaveSpawnparms (void)
 
 		// call the progs to get default spawn parms for the new client
 		pr_global_struct->self = EDICT_TO_PROG(host_client->edict);
-		PR_ExecuteProgram (pr_global_struct->SetChangeParms);
+		PR_ExecuteProgram(pr_func_struct->SetChangeParms);
 		for (j=0 ; j<NUM_SPAWN_PARMS ; j++)
 			host_client->spawn_parms[j] = (&pr_global_struct->parm1)[j];
 	}
@@ -253,20 +261,6 @@ void SV_CalcPHS (void)
 		, vcount/num, count/num, num);
 }
 
-unsigned SV_CheckModel(char *mdl)
-{
-	byte	stackbuf[1024];		// avoid dirtying the cache heap
-	byte *buf;
-	unsigned short crc;
-//	int len;
-
-	buf = (byte *)COM_LoadStackFile (mdl, stackbuf, sizeof(stackbuf));
-	crc = CRC_Block(buf, com_filesize);
-//	for (len = com_filesize; len; len--, buf++)
-//		CRC_ProcessByte(&crc, *buf);
-
-	return crc;
-}
 
 /*
 ================
@@ -283,14 +277,21 @@ void SV_SpawnServer (char *server)
 	edict_t		*ent;
 	int			i;
 
-	Con_DPrintf ("SpawnServer: %s\n",server);
+	Con_DPrintf("SpawnServer: %s\n",server);
 	
-	SV_SaveSpawnparms ();
+	SV_SaveSpawnparms();
 
 	svs.spawncount++;		// any partially connected client will be
 							// restarted
 
 	sv.state = ss_dead;
+
+    if (PyCallable_Check(qwp_engine->reset_game))
+        PR_ExecuteProgram(qwp_engine->reset_game);
+    qwp_entity_clearall();  // discard any Python entities
+
+    Py_XDECREF(pr_global_struct->mapname);
+    memset(pr_global_struct, 0, sizeof(pr_global_struct));
 
 	Mod_ClearAll ();
 	Hunk_FreeToLowMark (host_hunklevel);
@@ -319,10 +320,10 @@ void SV_SpawnServer (char *server)
 
 	// load progs to get entity field count
 	// which determines how big each edict is
-	PR_LoadProgs ();
+	// PR_LoadProgs (); (PYTHON)
 
 	// allocate edicts
-	sv.edicts = Hunk_AllocName (MAX_EDICTS*pr_edict_size, "edicts");
+	sv.edicts = Hunk_AllocName (MAX_EDICTS * sizeof(edict_t), "edicts");
 	
 	// leave slots at start for clients only
 	sv.num_edicts = MAX_CLIENTS+1;
@@ -330,7 +331,7 @@ void SV_SpawnServer (char *server)
 	{
 		ent = EDICT_NUM(i+1);
 		svs.clients[i].edict = ent;
-//ZOID - make sure we update frags right
+        //ZOID - make sure we update frags right
 		svs.clients[i].old_frags = 0;
 	}
 
@@ -346,9 +347,9 @@ void SV_SpawnServer (char *server)
 	//
 	SV_ClearWorld ();
 	
-	sv.sound_precache[0] = pr_strings;
+	sv.sound_precache[0] = ""; // was pr_strings BBP PYTHON
 
-	sv.model_precache[0] = pr_strings;
+	sv.model_precache[0] = ""; // was pr_strings BBP PYTHON
 	sv.model_precache[1] = sv.modelname;
 	sv.models[1] = sv.worldmodel;
 	for (i=1 ; i<sv.worldmodel->numsubmodels ; i++)
@@ -358,8 +359,8 @@ void SV_SpawnServer (char *server)
 	}
 
 	//check player/eyes models for hacks
-	sv.model_player_checksum = SV_CheckModel("progs/player.mdl");
-	sv.eyes_player_checksum = SV_CheckModel("progs/eyes.mdl");
+	sv.model_player_checksum = COM_CRC_File("progs/player.mdl");
+	sv.eyes_player_checksum = COM_CRC_File("progs/eyes.mdl");
 
 	//
 	// spawn the rest of the entities on the map
@@ -371,12 +372,17 @@ void SV_SpawnServer (char *server)
 
 	ent = EDICT_NUM(0);
 	ent->free = false;
-	ent->v.model = PR_SetString(sv.worldmodel->name);
+	ent->v.model = PyString_FromString(sv.worldmodel->name);
 	ent->v.modelindex = 1;		// world model
 	ent->v.solid = SOLID_BSP;
 	ent->v.movetype = MOVETYPE_PUSH;
 
-	pr_global_struct->mapname = PR_SetString(sv.name);
+    // attach the Python world entity, which already exists, to the 
+    // C world edict_t.  No need to fool with Py_INCREF
+    ent->p_entity = (qwp_entity_t *)(qwp_engine->world);
+    ent->p_entity->c_entity = ent;
+
+	pr_global_struct->mapname = PyString_FromString(sv.name);
 	// serverflags are for cross level information (sigils)
 	pr_global_struct->serverflags = svs.serverflags;
 	
@@ -384,7 +390,15 @@ void SV_SpawnServer (char *server)
 	SV_ProgStartFrame ();
 
 	// load and spawn all other entities
-	ED_LoadFromFile (sv.worldmodel->entities);
+	// ED_LoadFromFile (sv.worldmodel->entities);
+        {
+        PyObject *result = PyObject_CallFunction(qwp_engine->spawn_func, "{s:s,s:s}", "mapname", sv.name, "entities", sv.worldmodel->entities);
+        if (result)
+            Py_DECREF(result);
+        else
+            PyErr_Print();
+        }
+
 
 	// look up some model indexes for specialized message compression
 	SV_FindModelNumbers ();

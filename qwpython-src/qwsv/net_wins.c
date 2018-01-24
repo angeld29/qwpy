@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // net_wins.c
 
 #include "quakedef.h"
-#include "winquake.h"
+#include <windows.h>
 
 netadr_t	net_local_adr;
 
@@ -121,7 +121,7 @@ qboolean	NET_StringToAdr (char *s, netadr_t *a)
 	else
 	{
 		if ((h = gethostbyname(copy)) == 0)
-			return 0;
+			return false;
 		*(int *)&sadr.sin_addr = *(int *)h->h_addr_list[0];
 	}
 	
@@ -134,8 +134,8 @@ qboolean	NET_StringToAdr (char *s, netadr_t *a)
 // the IP is NOT one of our interfaces.
 qboolean NET_IsClientLegal(netadr_t *adr)
 {
-	struct sockaddr_in sadr;
-	int newsocket;
+//	struct sockaddr_in sadr;
+//	int newsocket; (BBP Unreferenced local variables sadr and newsocket)
 
 #if 0
 	if (adr->ip[0] == 127)
@@ -175,18 +175,18 @@ qboolean NET_GetPacket (void)
 
 	if (ret == -1)
 	{
-		int errno = WSAGetLastError();
+		int my_errno = WSAGetLastError();
 
-		if (errno == WSAEWOULDBLOCK)
+		if (my_errno == WSAEWOULDBLOCK)
 			return false;
-		if (errno == WSAEMSGSIZE) {
+		if (my_errno == WSAEMSGSIZE) {
 			Con_Printf ("Warning:  Oversize packet from %s\n",
 				NET_AdrToString (net_from));
 			return false;
 		}
 
 
-		Sys_Error ("NET_GetPacket: %s", strerror(errno));
+		Sys_Error ("NET_GetPacket: %d %s", my_errno, strerror(my_errno));
 	}
 
 	net_message.cursize = ret;
@@ -196,12 +196,12 @@ qboolean NET_GetPacket (void)
 		return false;
 	}
 
-	return ret;
+	return (qboolean)(ret > 0);
 }
 
 //=============================================================================
 
-void NET_SendPacket (int length, void *data, netadr_t to)
+void NET_SendPacket(size_t length, void *data, netadr_t to)
 {
 	int ret;
 	struct sockaddr_in	addr;

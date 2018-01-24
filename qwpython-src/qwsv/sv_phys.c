@@ -98,12 +98,12 @@ void SV_CheckVelocity (edict_t *ent)
 	{
 		if (IS_NAN(ent->v.velocity[i]))
 		{
-			Con_Printf ("Got a NaN velocity on %s\n", PR_GetString(ent->v.classname));
+			Con_Printf ("Got a NaN velocity on %s\n", PyString_AsString(ent->v.classname));
 			ent->v.velocity[i] = 0;
 		}
 		if (IS_NAN(ent->v.origin[i]))
 		{
-			Con_Printf ("Got a NaN origin on %s\n", PR_GetString(ent->v.classname));
+			Con_Printf ("Got a NaN origin on %s\n", PyString_AsString(ent->v.classname));
 			ent->v.origin[i] = 0;
 		}
 		if (ent->v.velocity[i] > sv_maxvelocity.value)
@@ -825,7 +825,7 @@ void SV_ProgStartFrame (void)
 	pr_global_struct->self = EDICT_TO_PROG(sv.edicts);
 	pr_global_struct->other = EDICT_TO_PROG(sv.edicts);
 	pr_global_struct->time = sv.time;
-	PR_ExecuteProgram (pr_global_struct->StartFrame);
+	PR_ExecuteProgram(pr_func_struct->StartFrame);
 }
 
 /*
